@@ -8,19 +8,22 @@ from multiprocessing import Pool
 import gradio as gr
 import jax.numpy as jnp
 import numpy as np
+
 from jax.experimental.compilation_cache import compilation_cache as cc
 from transformers.models.whisper.tokenization_whisper import TO_LANGUAGE_CODE
 from transformers.pipelines.audio_utils import ffmpeg_read
 
 from whisper_jax import FlaxWhisperPipline
 
+
 cc.initialize_cache("./jax_cache")
 checkpoint = "openai/whisper-large-v3"
 
-BATCH_SIZE = 5
+BATCH_SIZE = 32
 CHUNK_LENGTH_S = 30
-NUM_PROC = 5
+NUM_PROC = 32
 FILE_LIMIT_MB = 1000
+YT_LENGTH_LIMIT_S = 7200  # limit to 2 hour YouTube files
 
 title = "Whisper JAX: The Fastest Whisper API ⚡️"
 
@@ -43,8 +46,10 @@ formatter = logging.Formatter("%(asctime)s;%(levelname)s;%(message)s", "%Y-%m-%d
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
+
 def identity(batch):
     return batch
+
 
 # Copied from https://github.com/openai/whisper/blob/c09a7ae299c4c34c5839a76380ae407e7d785914/whisper/utils.py#L50
 def format_timestamp(seconds: float, always_include_hours: bool = False, decimal_marker: str = "."):
@@ -65,6 +70,7 @@ def format_timestamp(seconds: float, always_include_hours: bool = False, decimal
     else:
         # we have a malformed timestamp so just return it as is
         return seconds
+
 
 if __name__ == "__main__":
     pipeline = FlaxWhisperPipline(checkpoint, dtype=jnp.bfloat16, batch_size=BATCH_SIZE)
@@ -145,6 +151,76 @@ if __name__ == "__main__":
         text, runtime = tqdm_generate(inputs, task=task, return_timestamps=return_timestamps, progress=progress)
         return text, runtime
 
+    def _return_yt_html_embed(yt_url):
+        video_id = yt_url.split("?v=")[-1]
+        HTML_str = (
+            f'<center> <iframe width="500" height="320" src="https://www.youtube.com/embed/{video_id}"> </iframe>'
+            " </center>"
+        )
+        return HTML_str
+
+    def download_yt_audio(yt_url, filename):
+        info_loader = youtube_dl.YoutubeDL()
+        try:
+            info = info_loader.extract_info(yt_url, download=False)
+        except youtube_dl.utils.DownloadError as err:
+            raise gr.Error(str(err))
+
+        file_length = info["duration_string"]
+        file_h_m_s = file_length.split(":")
+        file_h_m_s = [int(sub_length) for sub_length in file_h_m_s]
+        if len(file_h_m_s) == 1:
+            file_h_m_s.insert(0, 0)
+        if len(file_h_m_s) == 2:
+            file_h_m_s.insert(0, 0)
+
+        file_length_s = file_h_m_s[0] * 3600 + file_h_m_s[1] * 60 + file_h_m_s[2]
+        if file_length_s > YT_LENGTH_LIMIT_S:
+            yt_length_limit_hms = time.strftime("%HH:%MM:%SS", time.gmtime(YT_LENGTH_LIMIT_S))
+            file_length_hms = time.strftime("%HH:%MM:%SS", time.gmtime(file_length_s))
+            raise gr.Error(f"Maximum YouTube length is {yt_length_limit_hms}, got {file_length_hms} YouTube video.")
+
+        ydl_opts = {"outtmpl": filename, "format": "worstvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"}
+        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+            try:
+                ydl.download([yt_url])
+            except youtube_dl.utils.ExtractorError as err:
+                raise gr.Error(str(err))
+
+    def transcribe_youtube(yt_url, task, return_timestamps, progress=gr.Progress()):
+        progress(0, desc="Loading audio file...")
+        logger.info("loading youtube file...")
+        html_embed_str = _return_yt_html_embed(yt_url)
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            filepath = os.path.join(tmpdirname, "video.mp4")
+            download_yt_audio(yt_url, filepath)
+
+            with open(filepath, "rb") as f:
+                inputs = f.read()
+
+        inputs = ffmpeg_read(inputs, pipeline.feature_extractor.sampling_rate)
+        inputs = {"array": inputs, "sampling_rate": pipeline.feature_extractor.sampling_rate}
+        logger.info("done loading...")
+        text, runtime = tqdm_generate(inputs, task=task, return_timestamps=return_timestamps, progress=progress)
+        return html_embed_str, text, runtime
+
+    microphone_chunked = gr.Interface(
+        fn=transcribe_chunked_audio,
+        inputs=[
+            gr.Audio(type="filepath"),
+            gr.Radio(["transcribe", "translate"], label="Task", value="transcribe"),
+            gr.Checkbox(value=False, label="Return timestamps"),
+        ],
+        outputs=[
+            gr.Textbox(label="Transcription", show_copy_button=True),
+            gr.Textbox(label="Transcription Time (s)"),
+        ],
+        allow_flagging="never",
+        title=title,
+        description=description,
+        article=article,
+    )
+
     audio_chunked = gr.Interface(
         fn=transcribe_chunked_audio,
         inputs=[
@@ -162,10 +238,30 @@ if __name__ == "__main__":
         article=article,
     )
 
+    youtube = gr.Interface(
+        fn=transcribe_youtube,
+        inputs=[
+            gr.Textbox(lines=1, placeholder="Paste the URL to a YouTube video here", label="YouTube URL"),
+            gr.Radio(["transcribe", "translate"], label="Task", value="transcribe"),
+            gr.Checkbox(value=False, label="Return timestamps"),
+        ],
+        outputs=[
+            gr.HTML(label="Video"),
+            gr.Textbox(label="Transcription", show_copy_button=True),
+            gr.Textbox(label="Transcription Time (s)"),
+        ],
+        allow_flagging="never",
+        title=title,
+        examples=[["https://www.youtube.com/watch?v=m8u-18Q0s7I", "transcribe", False]],
+        cache_examples=False,
+        description=description,
+        article=article,
+    )
+
     demo = gr.Blocks()
 
     with demo:
-        gr.TabbedInterface([audio_chunked], ["Audio File"])
+        gr.TabbedInterface([microphone_chunked, audio_chunked, youtube], ["Microphone", "Audio File", "YouTube"])
 
     demo.queue(max_size=5)
     demo.launch(server_name="0.0.0.0", server_port=80, show_api=False)
