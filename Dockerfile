@@ -24,4 +24,4 @@ RUN rm -rf ~/.cache/huggingface
 RUN apt-get update && apt-get install -y ffmpeg
 # Mở cổng 7860
 EXPOSE 7860
-CMD ["python", "app/app.py"]
+# CMD ["python", "app/app.py"]
