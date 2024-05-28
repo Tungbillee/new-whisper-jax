@@ -42,7 +42,8 @@ logger = logging.getLogger("whisper-jax-app")
 logger.setLevel(logging.INFO)
 ch = logging.StreamHandler()
 ch.setLevel(logging.INFO)
-formatter = logging.Formatter("%(asctime)s;%(levelname)s;%(message)s", "%Y-%m-%d %H:%M:%S")
+formatter = logging.Formatter(
+    "%(asctime)s;%(levelname)s;%(message)s", "%Y-%m-%d %H:%M:%S")
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
@@ -65,7 +66,8 @@ def format_timestamp(seconds: float, always_include_hours: bool = False, decimal
         seconds = milliseconds // 1_000
         milliseconds -= seconds * 1_000
 
-        hours_marker = f"{hours:02d}:" if always_include_hours or hours > 0 else ""
+        hours_marker = f"{
+            hours:02d}:" if always_include_hours or hours > 0 else ""
         return f"{hours_marker}{minutes:02d}:{seconds:02d}{decimal_marker}{milliseconds:03d}"
     else:
         # we have a malformed timestamp so just return it as is
@@ -73,10 +75,13 @@ def format_timestamp(seconds: float, always_include_hours: bool = False, decimal
 
 
 if __name__ == "__main__":
-    pipeline = FlaxWhisperPipline(checkpoint, dtype=jnp.bfloat16, batch_size=BATCH_SIZE)
+    pipeline = FlaxWhisperPipline(
+        checkpoint, dtype=jnp.bfloat16, batch_size=BATCH_SIZE)
     stride_length_s = CHUNK_LENGTH_S / 6
-    chunk_len = round(CHUNK_LENGTH_S * pipeline.feature_extractor.sampling_rate)
-    stride_left = stride_right = round(stride_length_s * pipeline.feature_extractor.sampling_rate)
+    chunk_len = round(
+        CHUNK_LENGTH_S * pipeline.feature_extractor.sampling_rate)
+    stride_left = stride_right = round(
+        stride_length_s * pipeline.feature_extractor.sampling_rate)
     step = chunk_len - stride_left - stride_right
     pool = Pool(NUM_PROC)
 
@@ -85,10 +90,12 @@ if __name__ == "__main__":
     start = time.time()
     random_inputs = {
         "input_features": np.ones(
-            (BATCH_SIZE, pipeline.model.config.num_mel_bins, 2 * pipeline.model.config.max_source_positions)
+            (BATCH_SIZE, pipeline.model.config.num_mel_bins,
+             2 * pipeline.model.config.max_source_positions)
         )
     }
-    random_timestamps = pipeline.forward(random_inputs, batch_size=BATCH_SIZE, return_timestamps=True)
+    random_timestamps = pipeline.forward(
+        random_inputs, batch_size=BATCH_SIZE, return_timestamps=True)
     compile_time = time.time() - start
     logger.info(f"compiled in {compile_time}s")
 
@@ -101,7 +108,8 @@ if __name__ == "__main__":
             range(num_batches)
         )  # Gradio progress bar not compatible with generator, see https://github.com/gradio-app/gradio/issues/3841
 
-        dataloader = pipeline.preprocess_batch(inputs, chunk_length_s=CHUNK_LENGTH_S, batch_size=BATCH_SIZE)
+        dataloader = pipeline.preprocess_batch(
+            inputs, chunk_length_s=CHUNK_LENGTH_S, batch_size=BATCH_SIZE)
         progress(0, desc="Pre-processing audio file...")
         logger.info("pre-processing audio file...")
         dataloader = pool.map(identity, dataloader)
@@ -112,17 +120,20 @@ if __name__ == "__main__":
         logger.info("transcribing...")
         # iterate over our chunked audio samples - always predict timestamps to reduce hallucinations
         for batch, _ in zip(dataloader, progress.tqdm(dummy_batches, desc="Transcribing...")):
-            model_outputs.append(pipeline.forward(batch, batch_size=BATCH_SIZE, task=task, return_timestamps=True))
+            model_outputs.append(pipeline.forward(
+                batch, batch_size=BATCH_SIZE, task=task, return_timestamps=True))
         runtime = time.time() - start_time
         logger.info("done transcription")
 
         logger.info("post-processing...")
-        post_processed = pipeline.postprocess(model_outputs, return_timestamps=True)
+        post_processed = pipeline.postprocess(
+            model_outputs, return_timestamps=True)
         text = post_processed["text"]
         if return_timestamps:
             timestamps = post_processed.get("chunks")
             timestamps = [
-                f"[{format_timestamp(chunk['timestamp'][0])} -> {format_timestamp(chunk['timestamp'][1])}] {chunk['text']}"
+                f"[{format_timestamp(
+                    chunk['timestamp'][0])} -> {format_timestamp(chunk['timestamp'][1])}] {chunk['text']}"
                 for chunk in timestamps
             ]
             text = "\n".join(str(feature) for feature in timestamps)
@@ -134,27 +145,32 @@ if __name__ == "__main__":
         logger.info("loading audio file...")
         if inputs is None:
             logger.warning("No audio file")
-            raise gr.Error("No audio file submitted! Please upload an audio file before submitting your request.")
+            raise gr.Error(
+                "No audio file submitted! Please upload an audio file before submitting your request.")
         file_size_mb = os.stat(inputs).st_size / (1024 * 1024)
         if file_size_mb > FILE_LIMIT_MB:
             logger.warning("Max file size exceeded")
             raise gr.Error(
-                f"File size exceeds file size limit. Got file of size {file_size_mb:.2f}MB for a limit of {FILE_LIMIT_MB}MB."
+                f"File size exceeds file size limit. Got file of size {
+                    file_size_mb:.2f}MB for a limit of {FILE_LIMIT_MB}MB."
             )
 
         with open(inputs, "rb") as f:
             inputs = f.read()
 
         inputs = ffmpeg_read(inputs, pipeline.feature_extractor.sampling_rate)
-        inputs = {"array": inputs, "sampling_rate": pipeline.feature_extractor.sampling_rate}
+        inputs = {"array": inputs,
+                  "sampling_rate": pipeline.feature_extractor.sampling_rate}
         logger.info("done loading")
-        text, runtime = tqdm_generate(inputs, task=task, return_timestamps=return_timestamps, progress=progress)
+        text, runtime = tqdm_generate(
+            inputs, task=task, return_timestamps=return_timestamps, progress=progress)
         return text, runtime
 
     def _return_yt_html_embed(yt_url):
         video_id = yt_url.split("?v=")[-1]
         HTML_str = (
-            f'<center> <iframe width="500" height="320" src="https://www.youtube.com/embed/{video_id}"> </iframe>'
+            f'<center> <iframe width="500" height="320" src="https://www.youtube.com/embed/{
+                video_id}"> </iframe>'
             " </center>"
         )
         return HTML_str
@@ -174,13 +190,18 @@ if __name__ == "__main__":
         if len(file_h_m_s) == 2:
             file_h_m_s.insert(0, 0)
 
-        file_length_s = file_h_m_s[0] * 3600 + file_h_m_s[1] * 60 + file_h_m_s[2]
+        file_length_s = file_h_m_s[0] * 3600 + \
+            file_h_m_s[1] * 60 + file_h_m_s[2]
         if file_length_s > YT_LENGTH_LIMIT_S:
-            yt_length_limit_hms = time.strftime("%HH:%MM:%SS", time.gmtime(YT_LENGTH_LIMIT_S))
-            file_length_hms = time.strftime("%HH:%MM:%SS", time.gmtime(file_length_s))
-            raise gr.Error(f"Maximum YouTube length is {yt_length_limit_hms}, got {file_length_hms} YouTube video.")
+            yt_length_limit_hms = time.strftime(
+                "%HH:%MM:%SS", time.gmtime(YT_LENGTH_LIMIT_S))
+            file_length_hms = time.strftime(
+                "%HH:%MM:%SS", time.gmtime(file_length_s))
+            raise gr.Error(f"Maximum YouTube length is {yt_length_limit_hms}, got {
+                           file_length_hms} YouTube video.")
 
-        ydl_opts = {"outtmpl": filename, "format": "worstvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"}
+        ydl_opts = {"outtmpl": filename,
+                    "format": "worstvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"}
         with youtube_dl.YoutubeDL(ydl_opts) as ydl:
             try:
                 ydl.download([yt_url])
@@ -199,16 +220,19 @@ if __name__ == "__main__":
                 inputs = f.read()
 
         inputs = ffmpeg_read(inputs, pipeline.feature_extractor.sampling_rate)
-        inputs = {"array": inputs, "sampling_rate": pipeline.feature_extractor.sampling_rate}
+        inputs = {"array": inputs,
+                  "sampling_rate": pipeline.feature_extractor.sampling_rate}
         logger.info("done loading...")
-        text, runtime = tqdm_generate(inputs, task=task, return_timestamps=return_timestamps, progress=progress)
+        text, runtime = tqdm_generate(
+            inputs, task=task, return_timestamps=return_timestamps, progress=progress)
         return html_embed_str, text, runtime
 
     microphone_chunked = gr.Interface(
         fn=transcribe_chunked_audio,
         inputs=[
             gr.Audio(type="filepath"),
-            gr.Radio(["transcribe", "translate"], label="Task", value="transcribe"),
+            gr.Radio(["transcribe", "translate"],
+                     label="Task", value="transcribe"),
             gr.Checkbox(value=False, label="Return timestamps"),
         ],
         outputs=[
@@ -225,7 +249,8 @@ if __name__ == "__main__":
         fn=transcribe_chunked_audio,
         inputs=[
             gr.Audio(type="filepath"),
-            gr.Radio(["transcribe", "translate"], label="Task", value="transcribe"),
+            gr.Radio(["transcribe", "translate"],
+                     label="Task", value="transcribe"),
             gr.Checkbox(value=False, label="Return timestamps"),
         ],
         outputs=[
@@ -241,8 +266,10 @@ if __name__ == "__main__":
     youtube = gr.Interface(
         fn=transcribe_youtube,
         inputs=[
-            gr.Textbox(lines=1, placeholder="Paste the URL to a YouTube video here", label="YouTube URL"),
-            gr.Radio(["transcribe", "translate"], label="Task", value="transcribe"),
+            gr.Textbox(
+                lines=1, placeholder="Paste the URL to a YouTube video here", label="YouTube URL"),
+            gr.Radio(["transcribe", "translate"],
+                     label="Task", value="transcribe"),
             gr.Checkbox(value=False, label="Return timestamps"),
         ],
         outputs=[
@@ -252,7 +279,8 @@ if __name__ == "__main__":
         ],
         allow_flagging="never",
         title=title,
-        examples=[["https://www.youtube.com/watch?v=m8u-18Q0s7I", "transcribe", False]],
+        examples=[
+            ["https://www.youtube.com/watch?v=m8u-18Q0s7I", "transcribe", False]],
         cache_examples=False,
         description=description,
         article=article,
@@ -261,7 +289,8 @@ if __name__ == "__main__":
     demo = gr.Blocks()
 
     with demo:
-        gr.TabbedInterface([microphone_chunked, audio_chunked, youtube], ["Microphone", "Audio File", "YouTube"])
+        gr.TabbedInterface([microphone_chunked, audio_chunked, youtube], [
+                           "Microphone", "Audio File", "YouTube"])
 
     demo.queue(max_size=5)
-    demo.launch(server_name="0.0.0.0", show_api=False)
+    demo.launch(server_name="0.0.0.0", server_port=80, show_api=False)

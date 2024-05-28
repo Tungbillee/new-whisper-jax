@@ -1,4 +1,4 @@
-FROM python:3.8
+FROM python:3.9
 WORKDIR /app
 
 RUN pip install --upgrade pip
@@ -22,10 +22,8 @@ RUN rm -rf ~/.cache/huggingface
 
 # Cài đặt ffmpeg để chuyển đổi video
 RUN apt-get update && apt-get install -y ffmpeg
-# Mở cổng 6789
-EXPOSE 6789
 
-ENV TPU_IP_ADDRESS=10.128.0.4
-ENV XRT_TPU_CONFIG="tpu_worker;0;$TPU_IP_ADDRESS:8470"
+# ENV TPU_IP_ADDRESS=10.128.0.4
+# ENV XRT_TPU_CONFIG="tpu_worker;0;$TPU_IP_ADDRESS:8470"
 
 CMD ["python", "app/app.py"]
