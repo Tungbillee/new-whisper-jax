@@ -22,7 +22,7 @@ RUN rm -rf ~/.cache/huggingface
 
 # Cài đặt ffmpeg để chuyển đổi video
 RUN apt-get update && apt-get install -y ffmpeg
-# Mở cổng 7860
-EXPOSE 80
+# Mở cổng 6789
+EXPOSE 6789
 
 CMD ["python", "app/app.py"]
