@@ -1,4 +1,4 @@
-FROM python:3.9
+FROM python:3.8
 WORKDIR /app
 
 RUN pip install --upgrade pip
@@ -24,4 +24,5 @@ RUN rm -rf ~/.cache/huggingface
 RUN apt-get update && apt-get install -y ffmpeg
 # Mở cổng 7860
 EXPOSE 7860
+
 CMD ["python", "app/app.py"]
