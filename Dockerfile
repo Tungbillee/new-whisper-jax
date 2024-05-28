@@ -12,8 +12,11 @@ RUN pip install -e .["endpoint"]
 RUN pip install ml-dtypes==0.2.0
 RUN pip install --upgrade transformers jax jaxlib
 
+
 # Xóa cache của huggingface nếu cần thiết
 RUN rm -rf ~/.cache/huggingface
 
+# Cài đặt ffmpeg để chuyển đổi video
+RUN apt-get update && apt-get install -y ffmpeg
 # Mở cổng 7860
 EXPOSE 7860
