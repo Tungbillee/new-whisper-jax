@@ -1,0 +1,18 @@
+version: "3.8"
+
+networks:
+  lan_network:
+    name: lan_network
+
+services:
+  app:
+    build: .
+    ports:
+      - "6001:6000"
+    volumes:
+      - .:/app
+    container_name: python_app
+    restart: always
+    command: python app.py
+    networks:
+      - lan_network
