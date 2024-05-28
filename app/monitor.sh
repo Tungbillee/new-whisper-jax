@@ -2,7 +2,7 @@
 
 waiting=0
 check_server() {
-	url=http://localhost:7860
+	url=http://localhost
 	response_code=$(curl -o /dev/null -s -w "%{http_code}" --connect-timeout 2 $url)
 	[[ $response_code -ne 200 ]] && {
 		return 0
