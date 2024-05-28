@@ -1,11 +1,19 @@
 FROM python:3.9
 WORKDIR /app
-EXPOSE 7860
+
+RUN pip install --upgrade pip
+# Sao chép mã nguồn cuối cùng để không làm mất cache của các bước cài đặt gói
 COPY . .
-# COPY requirements.txt requirements.txt
-# RUN apt-get update \
-#     && rm -rf /var/lib/apt/lists/*
-# RUN pip install --no-cache-dir -r requirements.txt
+
+# Cài đặt dự án với các phần phụ thuộc bổ sung
 RUN pip install -e .["endpoint"]
-COPY . .
-CMD ["python", "app.py"]
+
+# Cài đặt các gói bổ sung
+RUN pip install ml-dtypes==0.2.0
+RUN pip install --upgrade transformers jax jaxlib
+
+# Xóa cache của huggingface nếu cần thiết
+RUN rm -rf ~/.cache/huggingface
+
+# Mở cổng 7860
+EXPOSE 7860

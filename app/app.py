@@ -207,7 +207,7 @@ if __name__ == "__main__":
     microphone_chunked = gr.Interface(
         fn=transcribe_chunked_audio,
         inputs=[
-            gr.Audio(source="microphone", type="filepath"),
+            gr.Audio(type="filepath"),
             gr.Radio(["transcribe", "translate"], label="Task", value="transcribe"),
             gr.Checkbox(value=False, label="Return timestamps"),
         ],
@@ -224,7 +224,7 @@ if __name__ == "__main__":
     audio_chunked = gr.Interface(
         fn=transcribe_chunked_audio,
         inputs=[
-            gr.Audio(source="upload", label="Audio file", type="filepath"),
+            gr.Audio(type="filepath"),
             gr.Radio(["transcribe", "translate"], label="Task", value="transcribe"),
             gr.Checkbox(value=False, label="Return timestamps"),
         ],
