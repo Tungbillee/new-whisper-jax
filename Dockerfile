@@ -4,7 +4,7 @@ WORKDIR /app
 RUN pip install --upgrade pip
 # Sao chép mã nguồn cuối cùng để không làm mất cache của các bước cài đặt gói
 COPY . .
-RUN pip install jax[tpu] -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
+# RUN pip install jax[tpu] -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
 
 
 # Chạy tệp kiểm tra TPU
