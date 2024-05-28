@@ -160,6 +160,8 @@ if __name__ == "__main__":
         title=title,
         description=description,
         article=article,
+        api_name="/predict_1"
+
     )
 
     demo = gr.Blocks()
