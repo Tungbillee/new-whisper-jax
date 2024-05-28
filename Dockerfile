@@ -4,10 +4,6 @@ WORKDIR /app
 RUN pip install --upgrade pip
 # Sao chép mã nguồn cuối cùng để không làm mất cache của các bước cài đặt gói
 COPY . .
-# RUN pip install jax[tpu] -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
-
-
-# Chạy tệp kiểm tra TPU
 
 # Cài đặt dự án với các phần phụ thuộc bổ sung
 RUN pip install -e .["endpoint"]
@@ -16,7 +12,6 @@ RUN pip install -e .["endpoint"]
 RUN pip install ml-dtypes==0.2.0
 RUN pip install --upgrade transformers jax jaxlib
 
-
 # Xóa cache của huggingface nếu cần thiết
 RUN rm -rf ~/.cache/huggingface
 
@@ -24,4 +19,3 @@ RUN rm -rf ~/.cache/huggingface
 RUN apt-get update && apt-get install -y ffmpeg
 # Mở cổng 7860
 EXPOSE 7860
-# CMD ["python", "app/app.py"]
