@@ -17,9 +17,9 @@ from whisper_jax import FlaxWhisperPipline
 cc.initialize_cache("./jax_cache")
 checkpoint = "openai/whisper-large-v3"
 
-BATCH_SIZE = 32
+BATCH_SIZE = 5
 CHUNK_LENGTH_S = 30
-NUM_PROC = 32
+NUM_PROC = 5
 FILE_LIMIT_MB = 1000
 
 title = "Whisper JAX: The Fastest Whisper API ⚡️"
@@ -160,8 +160,6 @@ if __name__ == "__main__":
         title=title,
         description=description,
         article=article,
-        api_name="/predict_1"
-
     )
 
     demo = gr.Blocks()
