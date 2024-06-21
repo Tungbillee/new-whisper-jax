@@ -5,7 +5,7 @@ RUN pip install --upgrade pip
 # Sao chép mã nguồn cuối cùng để không làm mất cache của các bước cài đặt gói
 COPY . .
 
-RUN pip install numpy<2
+RUN pip install "numpy<2"
 RUN pip install jax[tpu] -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
 
 
