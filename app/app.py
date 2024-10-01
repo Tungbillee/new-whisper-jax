@@ -16,25 +16,23 @@ from transformers.pipelines.audio_utils import ffmpeg_read
 from whisper_jax import FlaxWhisperPipline
 
 
-cc.initialize_cache("./jax_cache")
+cc.set_cache_dir("/tmp/jax_cache")
 checkpoint = "openai/whisper-large-v3"
 
-BATCH_SIZE = 32
-CHUNK_LENGTH_S = 30
-NUM_PROC = 32
+BATCH_SIZE = 16
+CHUNK_LENGTH_S = 20
+NUM_PROC = 16
 FILE_LIMIT_MB = 1000
 YT_LENGTH_LIMIT_S = 7200  # limit to 2 hour YouTube files
 
-title = "Whisper JAX: The Fastest Whisper API ⚡️"
+title = "Quick Magic: The Fastest Smit API ⚡️"
 
-description = """Whisper JAX is an optimised implementation of the [Whisper model](https://huggingface.co/openai/whisper-large-v3) by OpenAI. It runs on JAX with a TPU v4-8 in the backend. Compared to PyTorch on an A100 GPU, it is over [**70x faster**](https://github.com/sanchit-gandhi/whisper-jax#benchmarks), making it the fastest Whisper API available.
-
+description = """Quick Magic is an optimised implementation of the  by SMIT. It runs on JAX with a TPU v4-8 in the backend. Compared to PyTorch on an A100 GPU, it is over, making it the fastest Smit API available.
 Note that at peak times, you may find yourself in the queue for this demo. When you submit a request, your queue position will be shown in the top right-hand side of the demo pane. Once you reach the front of the queue, your audio file will be transcribed, with the progress displayed through a progress bar.
-
-To skip the queue, you may wish to create your own inference endpoint, details for which can be found in the [Whisper JAX repository](https://github.com/sanchit-gandhi/whisper-jax#creating-an-endpoint).
+To skip the queue, you may wish to create your own inference endpoint, details for which can be found .
 """
 
-article = "Whisper large-v3 model by OpenAI. Backend running JAX on a TPU v4-8 through the generous support of the [TRC](https://sites.research.google/trc/about/) programme. Whisper JAX [code](https://github.com/sanchit-gandhi/whisper-jax) and Gradio demo by 🤗 Hugging Face."
+article = "Smit model by SMIT. Backend running JAX on a TPU v4-8 through the generous support of the [TRC](https://sites.research.google/trc/about/) programme. Quick Magic and Gradio demo by 🤗 Hugging Face."
 
 language_names = sorted(TO_LANGUAGE_CODE.keys())
 
@@ -74,7 +72,7 @@ def format_timestamp(seconds: float, always_include_hours: bool = False, decimal
 
 if __name__ == "__main__":
     pipeline = FlaxWhisperPipline(checkpoint, dtype=jnp.bfloat16, batch_size=BATCH_SIZE)
-    stride_length_s = CHUNK_LENGTH_S / 6
+    stride_length_s = CHUNK_LENGTH_S * 0.15
     chunk_len = round(CHUNK_LENGTH_S * pipeline.feature_extractor.sampling_rate)
     stride_left = stride_right = round(stride_length_s * pipeline.feature_extractor.sampling_rate)
     step = chunk_len - stride_left - stride_right
@@ -132,20 +130,42 @@ if __name__ == "__main__":
     def transcribe_chunked_audio(inputs, task, return_timestamps, progress=gr.Progress()):
         progress(0, desc="Loading audio file...")
         logger.info("loading audio file...")
+        logger.debug(f"Input type: {type(inputs)}") 
         if inputs is None:
             logger.warning("No audio file")
             raise gr.Error("No audio file submitted! Please upload an audio file before submitting your request.")
-        file_size_mb = os.stat(inputs).st_size / (1024 * 1024)
+        if isinstance(inputs, str):
+            file_path = inputs
+        elif isinstance(inputs, dict) and 'name' in inputs:
+            file_path = inputs['name']
+        else:
+            logger.error(f"Unexpected input format: {inputs}")
+            raise gr.Error("Invalid audio input format")
+
+
+        file_size_mb = os.stat(file_path).st_size / (1024 * 1024)
         if file_size_mb > FILE_LIMIT_MB:
             logger.warning("Max file size exceeded")
             raise gr.Error(
                 f"File size exceeds file size limit. Got file of size {file_size_mb:.2f}MB for a limit of {FILE_LIMIT_MB}MB."
             )
 
-        with open(inputs, "rb") as f:
+        with open(file_path, "rb") as f:
             inputs = f.read()
 
         inputs = ffmpeg_read(inputs, pipeline.feature_extractor.sampling_rate)
+
+
+        audio_duration = len(inputs) / pipeline.feature_extractor.sampling_rate
+        # Adjust CHUNK_LENGTH_S based on audio duration
+        global CHUNK_LENGTH_S
+        if audio_duration <= 60:  # 60 seconds = 1 minute
+            CHUNK_LENGTH_S = 15
+        else:
+            CHUNK_LENGTH_S = 30
+        
+
+
         inputs = {"array": inputs, "sampling_rate": pipeline.feature_extractor.sampling_rate}
         logger.info("done loading")
         text, runtime = tqdm_generate(inputs, task=task, return_timestamps=return_timestamps, progress=progress)
@@ -207,7 +227,7 @@ if __name__ == "__main__":
     microphone_chunked = gr.Interface(
         fn=transcribe_chunked_audio,
         inputs=[
-            gr.Audio(type="filepath"),
+            gr.Audio(type="filepath", label="Upload Audio"),
             gr.Radio(["transcribe", "translate"], label="Task", value="transcribe"),
             gr.Checkbox(value=False, label="Return timestamps"),
         ],
@@ -224,7 +244,7 @@ if __name__ == "__main__":
     audio_chunked = gr.Interface(
         fn=transcribe_chunked_audio,
         inputs=[
-            gr.Audio(type="filepath"),
+            gr.Audio(type="filepath", label="Upload Audio"),
             gr.Radio(["transcribe", "translate"], label="Task", value="transcribe"),
             gr.Checkbox(value=False, label="Return timestamps"),
         ],
@@ -264,4 +284,4 @@ if __name__ == "__main__":
         gr.TabbedInterface([microphone_chunked, audio_chunked, youtube], ["Microphone", "Audio File", "YouTube"])
 
     demo.queue(max_size=5)
-    demo.launch(server_name="0.0.0.0", server_port=80, show_api=False)
+    demo.launch(server_name="0.0.0.0",show_error=True, show_api=True, debug=True)
